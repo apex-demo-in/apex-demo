@@ -44,9 +44,3 @@ variable "public_subnet_count" {
     error_message = "public_subnet_count must be at least 1 and no greater than az_count."
   }
 }
-
-variable "flow_log_retention_days" {
-  description = "Retention in days for the VPC flow log group."
-  type        = number
-  default     = 365
-}

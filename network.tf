@@ -1,10 +1,13 @@
-data "aws_caller_identity" "current" {}
-
 data "aws_region" "current" {}
 
 data "aws_availability_zones" "available" {
   state = "available"
 }
+
+# NOTE: this VPC has no flow logging. Delivery requires an IAM role and the
+# stack's AWS connection denies iam:CreateRole, so it cannot be created here.
+# Tracked by an approved scan exception for CKV2_AWS_11 (warn), which is
+# intended to be withdrawn once the connection can create the delivery role.
 
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
