@@ -10,15 +10,12 @@ locals {
   azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
 
   # Private subnets exist in every AZ; public subnets only in the first
-  # public_subnet_count AZs, since they only front the NAT gateways here.
+  # public_subnet_count AZs.
   public_azs = slice(local.azs, 0, var.public_subnet_count)
 
   # /20 subnets carved out of the VPC CIDR: public first, private offset by 8.
   public_subnets  = { for idx, az in local.public_azs : az => cidrsubnet(var.vpc_cidr, 4, idx) }
   private_subnets = { for idx, az in local.azs : az => cidrsubnet(var.vpc_cidr, 4, idx + 8) }
-
-  # NAT gateways live in public subnets: one per public AZ, or a single shared one.
-  nat_azs = var.single_nat_gateway ? slice(local.public_azs, 0, 1) : local.public_azs
 }
 
 ############################
@@ -45,7 +42,7 @@ resource "aws_default_security_group" "this" {
 }
 
 ############################
-# Internet gateway (public egress/ingress path)
+# Internet gateway (public tier: for load balancers and bastion-free ingress)
 ############################
 
 resource "aws_internet_gateway" "this" {
@@ -76,6 +73,8 @@ resource "aws_subnet" "public" {
   }
 }
 
+# Private subnets have no route to the internet at all: no NAT gateway, so no
+# outbound egress. AWS services are reached over VPC endpoints instead.
 resource "aws_subnet" "private" {
   for_each = local.private_subnets
 
@@ -88,35 +87,6 @@ resource "aws_subnet" "private" {
     Name = "${var.name}-private-${each.key}"
     tier = "private"
   }
-}
-
-############################
-# NAT gateways (egress-only path for private subnets)
-############################
-
-resource "aws_eip" "nat" {
-  for_each = toset(local.nat_azs)
-
-  domain = "vpc"
-
-  tags = {
-    Name = "${var.name}-nat-eip-${each.key}"
-  }
-
-  depends_on = [aws_internet_gateway.this]
-}
-
-resource "aws_nat_gateway" "this" {
-  for_each = toset(local.nat_azs)
-
-  allocation_id = aws_eip.nat[each.key].id
-  subnet_id     = aws_subnet.public[each.key].id
-
-  tags = {
-    Name = "${var.name}-nat-${each.key}"
-  }
-
-  depends_on = [aws_internet_gateway.this]
 }
 
 ############################
@@ -145,8 +115,8 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# One private route table per AZ. It uses the NAT gateway in its own AZ when there
-# is one, otherwise it falls back to the NAT gateway in the first public AZ.
+# One private route table per AZ. It carries only local VPC routes plus the S3
+# gateway endpoint; there is deliberately no 0.0.0.0/0 route.
 resource "aws_route_table" "private" {
   for_each = local.private_subnets
 
@@ -157,14 +127,6 @@ resource "aws_route_table" "private" {
   }
 }
 
-resource "aws_route" "private_nat" {
-  for_each = local.private_subnets
-
-  route_table_id         = aws_route_table.private[each.key].id
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.this[contains(local.nat_azs, each.key) ? each.key : local.nat_azs[0]].id
-}
-
 resource "aws_route_table_association" "private" {
   for_each = aws_subnet.private
 
@@ -173,7 +135,7 @@ resource "aws_route_table_association" "private" {
 }
 
 ############################
-# S3 gateway endpoint so private subnets reach S3 without the NAT gateways
+# S3 gateway endpoint: private subnets reach S3 without any egress path
 ############################
 
 resource "aws_vpc_endpoint" "s3" {
