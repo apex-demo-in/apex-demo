@@ -1,0 +1,27 @@
+# Local .terraform / .tofu directories (downloaded providers and modules)
+.terraform/
+.tofu/
+
+# State files — this stack uses a remote backend
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Variable files may contain secrets; commit explicit examples only
+*.tfvars
+*.tfvars.json
+!example.tfvars
+
+# CLI configuration and override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Saved plan output
+*.tfplan
