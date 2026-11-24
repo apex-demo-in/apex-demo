@@ -9,12 +9,16 @@ data "aws_availability_zones" "available" {
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
 
+  # Private subnets exist in every AZ; public subnets only in the first
+  # public_subnet_count AZs, since they only front the NAT gateways here.
+  public_azs = slice(local.azs, 0, var.public_subnet_count)
+
   # /20 subnets carved out of the VPC CIDR: public first, private offset by 8.
-  public_subnets  = { for idx, az in local.azs : az => cidrsubnet(var.vpc_cidr, 4, idx) }
+  public_subnets  = { for idx, az in local.public_azs : az => cidrsubnet(var.vpc_cidr, 4, idx) }
   private_subnets = { for idx, az in local.azs : az => cidrsubnet(var.vpc_cidr, 4, idx + 8) }
 
-  # One NAT gateway per AZ, or a single shared one in the first AZ.
-  nat_azs = var.single_nat_gateway ? slice(local.azs, 0, 1) : local.azs
+  # NAT gateways live in public subnets: one per public AZ, or a single shared one.
+  nat_azs = var.single_nat_gateway ? slice(local.public_azs, 0, 1) : local.public_azs
 }
 
 ############################
@@ -141,8 +145,8 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# One private route table per AZ, each pointing at the NAT gateway in its own AZ
-# (or at the single shared NAT gateway when single_nat_gateway is true).
+# One private route table per AZ. It uses the NAT gateway in its own AZ when there
+# is one, otherwise it falls back to the NAT gateway in the first public AZ.
 resource "aws_route_table" "private" {
   for_each = local.private_subnets
 
@@ -158,7 +162,7 @@ resource "aws_route" "private_nat" {
 
   route_table_id         = aws_route_table.private[each.key].id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = var.single_nat_gateway ? aws_nat_gateway.this[local.nat_azs[0]].id : aws_nat_gateway.this[each.key].id
+  nat_gateway_id         = aws_nat_gateway.this[contains(local.nat_azs, each.key) ? each.key : local.nat_azs[0]].id
 }
 
 resource "aws_route_table_association" "private" {

@@ -29,13 +29,24 @@ variable "vpc_cidr" {
 }
 
 variable "az_count" {
-  description = "Number of availability zones to spread public and private subnets across."
+  description = "Number of availability zones to spread the private subnets across."
   type        = number
   default     = 2
 }
 
+variable "public_subnet_count" {
+  description = "Number of public subnets to create, starting from the first availability zone. They only front the NAT gateways, so one is enough unless you need an AZ-redundant public tier."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.public_subnet_count >= 1 && var.public_subnet_count <= var.az_count
+    error_message = "public_subnet_count must be at least 1 and no greater than az_count."
+  }
+}
+
 variable "single_nat_gateway" {
-  description = "Use one shared NAT gateway instead of one per availability zone (cheaper, not highly available)."
+  description = "Use one shared NAT gateway instead of one per public subnet (cheaper, not highly available)."
   type        = bool
   default     = false
 }
