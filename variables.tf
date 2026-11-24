@@ -44,3 +44,15 @@ variable "public_subnet_count" {
     error_message = "public_subnet_count must be at least 1 and no greater than az_count."
   }
 }
+
+variable "enable_nat_gateway" {
+  description = "Give the private subnets an outbound internet path through NAT gateways. When false they have no egress at all and reach AWS services over VPC endpoints only."
+  type        = bool
+  default     = true
+}
+
+variable "single_nat_gateway" {
+  description = "Use one shared NAT gateway instead of one per public subnet (cheaper, not highly available)."
+  type        = bool
+  default     = false
+}
