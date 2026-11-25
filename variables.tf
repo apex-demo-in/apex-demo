@@ -38,14 +38,3 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
-
-variable "flow_log_retention_days" {
-  description = "Retention in days for the VPC flow log CloudWatch log group."
-  type        = number
-  default     = 365
-
-  validation {
-    condition     = var.flow_log_retention_days >= 365
-    error_message = "Flow log retention must be at least 365 days."
-  }
-}
