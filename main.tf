@@ -50,6 +50,7 @@ module "ecr" {
   repository_image_scan_on_push   = true
   repository_encryption_type      = "KMS"
   repository_kms_key              = aws_kms_key.main.arn
+  attach_repository_policy        = false
   create_repository_policy        = false
 
   repository_lifecycle_policy = jsonencode({
