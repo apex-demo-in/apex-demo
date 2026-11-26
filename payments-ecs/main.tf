@@ -6,6 +6,13 @@ locals {
   account_id    = data.aws_caller_identity.current.account_id
   partition     = data.aws_partition.current.partition
   log_group_arn = "arn:${local.partition}:logs:${var.region}:${local.account_id}:log-group:/aws/ecs/${var.cluster_name}"
+
+  # Set directly on resources (in addition to provider default_tags) so the
+  # required-tags policy sees owner and environment on every resource.
+  common_tags = {
+    owner       = var.owner
+    environment = var.environment
+  }
 }
 
 # One customer-managed KMS key for the stack, reused for ECS Exec and CloudWatch Logs.
@@ -13,6 +20,7 @@ resource "aws_kms_key" "this" {
   description             = "KMS key for the ${var.cluster_name} ECS cluster (ECS Exec and logs)"
   enable_key_rotation     = true
   deletion_window_in_days = 30
+  tags                    = local.common_tags
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -96,4 +104,6 @@ module "ecs_cluster" {
 
   # Cluster only for now: no services, task definitions or load balancer.
   services = {}
+
+  tags = local.common_tags
 }
