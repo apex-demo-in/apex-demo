@@ -40,8 +40,20 @@ variable "private_subnets" {
   default     = ["10.0.1.0/24", "10.0.2.0/24"]
 }
 
+variable "public_subnets" {
+  description = "CIDR blocks for public subnets (ALB and Fargate outbound ECR pull)"
+  type        = list(string)
+  default     = ["10.0.101.0/24", "10.0.102.0/24"]
+}
+
 variable "ecr_repository_name" {
   description = "Name of the ECR repository for the demo container image"
   type        = string
   default     = "podinfo"
+}
+
+variable "podinfo_image" {
+  description = "Podinfo container image in the stack's ECR repository, pinned by digest"
+  type        = string
+  default     = "941377153949.dkr.ecr.us-west-2.amazonaws.com/podinfo@sha256:866131aab5da60d503184ef073a38260195166aa1fda1f7e0682ff572dd86bc9"
 }
